@@ -85,74 +85,145 @@
 //    }
 //}
 
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+//package com.example.where2upt
+//
+//import android.os.Bundle
+//import androidx.activity.ComponentActivity
+//import androidx.activity.compose.setContent
+//import androidx.compose.foundation.layout.*
+//import androidx.compose.foundation.lazy.LazyColumn
+//import androidx.compose.foundation.lazy.items
+//import androidx.compose.material3.*
+//import androidx.compose.runtime.*
+//import androidx.compose.ui.Modifier
+//import androidx.compose.ui.unit.dp
+//import kotlinx.coroutines.launch
+//
+//class MainActivity : ComponentActivity() {
+//    override fun onCreate(savedInstanceState: Bundle?) {
+//        super.onCreate(savedInstanceState)
+//        setContent { UsersScreen() }
+//    }
+//}
+//
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//fun UsersScreen() {
+//    val repo = remember { UserRepository() }
+//    val scope = rememberCoroutineScope()
+//
+//    var users by remember { mutableStateOf(listOf<UserProfile>()) }
+//    var selectedRole by remember { mutableStateOf("student") }
+//    var error by remember { mutableStateOf<String?>(null) }
+//
+//    Scaffold(
+//        topBar = { TopAppBar(title = { Text("UPT • Users by Role") }) }
+//    ) { padding ->
+//        Column(Modifier.padding(padding).padding(12.dp)) {
+//            Row {
+//                listOf("student", "rep", "staff", "host", "admin").forEach { role ->
+//                    Button(
+//                        onClick = {
+//                            scope.launch {
+//                                try {
+//                                    users = repo.getAllByRole(role)
+//                                    selectedRole = role
+//                                    error = null
+//                                } catch (e: Exception) {
+//                                    error = e.message
+//                                }
+//                            }
+//                        },
+//                        modifier = Modifier.padding(end = 8.dp)
+//                    ) {
+//                        Text(role)
+//                    }
+//                }
+//            }
+//            Spacer(Modifier.height(16.dp))
+//            Text("Rol selectat: $selectedRole", style = MaterialTheme.typography.titleMedium)
+//            error?.let { Text("Eroare: $it", color = MaterialTheme.colorScheme.error) }
+//            LazyColumn {
+//                items(users, key = { it.uid }) { user ->
+//                    ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+//                        Column(Modifier.padding(8.dp)) {
+//                            Text(user.displayName, style = MaterialTheme.typography.titleMedium)
+//                            Text("${user.email} (${user.role})", style = MaterialTheme.typography.bodySmall)
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
+
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+
 package com.example.where2upt
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
+import androidx.compose.ui.res.painterResource
+import com.example.where2upt.ui.theme.Where2UPTTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { UsersScreen() }
+        setContent {
+            Where2UPTTheme {
+                AppRoot()
+            }
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private enum class Screen { HOME, ROOMS }
+
 @Composable
-fun UsersScreen() {
-    val repo = remember { UserRepository() }
-    val scope = rememberCoroutineScope()
+private fun AppRoot() {
+    var screen by remember { mutableStateOf(Screen.HOME) }
 
-    var users by remember { mutableStateOf(listOf<UserProfile>()) }
-    var selectedRole by remember { mutableStateOf("student") }
-    var error by remember { mutableStateOf<String?>(null) }
+    when (screen) {
+        Screen.HOME -> {
+            val user = UPTUser(
+                firstName = "Indi",
+                lastName = "Boțoc",
+                roles = setOf(UserRole.STUDENT)
+            )
+            HomeScreen(
+                user = user,
+                background = painterResource(R.drawable.bg_upt),
+                logo = painterResource(R.drawable.upt_logo),
+                onFindRoomClick = { screen = Screen.ROOMS },
+                onMyReservationsClick = { /* TODO: screen = Screen.RESERVATIONS */ },
+                onApproveRequestsClick = { /* TODO: screen = Screen.APPROVALS */ }
+            )
+        }
 
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("UPT • Users by Role") }) }
-    ) { padding ->
-        Column(Modifier.padding(padding).padding(12.dp)) {
-            Row {
-                listOf("student", "rep", "staff", "host", "admin").forEach { role ->
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    users = repo.getAllByRole(role)
-                                    selectedRole = role
-                                    error = null
-                                } catch (e: Exception) {
-                                    error = e.message
-                                }
-                            }
-                        },
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(role)
-                    }
+        Screen.ROOMS -> {
+            // Chemi ecranul cu tab-uri. Leagă aici repo-ul tău real.
+            val repo = remember { RoomRepository() }
+            RoomsScreen(
+                onSpecificSearch = { buildingId, blockId, floor, roomNumber ->
+                    // TODO: înlocuiește cu interogarea ta reală (Firestore/DAO)
+                    // ex: roomRepo.searchSpecific(buildingId, floor, roomNumber)
+                    repo.searchSpecific(buildingId, blockId, floor, roomNumber)
+                },
+                onPrefsSearch = { minCap, hasPCs, os ->
+                    // TODO: înlocuiește cu interogarea ta reală
+                    // ex: roomRepo.searchByPreferences(minCapacity, hasComputers, os)
+                    repo.searchByPreferences(minCap, hasPCs, os)
+                },
+                onRoomClick = { room ->
+                    // TODO: navighează la detalii: screen = Screen.ROOM_DETAILS
                 }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text("Rol selectat: $selectedRole", style = MaterialTheme.typography.titleMedium)
-            error?.let { Text("Eroare: $it", color = MaterialTheme.colorScheme.error) }
-            LazyColumn {
-                items(users, key = { it.uid }) { user ->
-                    ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                        Column(Modifier.padding(8.dp)) {
-                            Text(user.displayName, style = MaterialTheme.typography.titleMedium)
-                            Text("${user.email} (${user.role})", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
+            )
         }
     }
 }

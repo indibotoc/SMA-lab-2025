@@ -1,8 +1,11 @@
 package com.example.where2upt
 
+import com.google.firebase.Timestamp
+
 data class Room(
     val id: String = "",
     val buildingId: String = "",
+    val blockId: String = "",
     val facultyIds: List<String> = emptyList(),   // una sau mai multe
     val floor: Int = 0,
     val roomNumber: String = "",
@@ -14,8 +17,6 @@ data class Room(
     val studentReservable: Boolean = false,
     val status: String = "active",                // active|maintenance|archived
     val hostUid: String = "",
-    val geo: Map<String, Double> = emptyMap(),
-    val version: Int = 1,
-    val updatedAt: Long = 0,
+    val updatedAt: Timestamp? = null,
     val lastUpdatedBy: String = ""
 )
