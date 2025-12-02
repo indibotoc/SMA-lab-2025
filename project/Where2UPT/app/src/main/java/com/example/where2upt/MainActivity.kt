@@ -162,68 +162,98 @@
 
 /////////////////////////////////////////////////////////////////////////////////////
 
-
 package com.example.where2upt
 
+import AuthScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.painterResource
 import com.example.where2upt.ui.theme.Where2UPTTheme
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            Where2UPTTheme {
-                AppRoot()
-            }
-        }
+        setContent { Where2UPTTheme { AppRoot() } }
     }
 }
 
-private enum class Screen { HOME, ROOMS }
+private enum class Screen { AUTH, HOME, ROOMS, ROOM_DETAILS }
 
 @Composable
 private fun AppRoot() {
-    var screen by remember { mutableStateOf(Screen.HOME) }
+    val authRepo = remember { AuthRepository() }
+    val roomRepo = remember { RoomRepository() }
+
+    var user by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+
+    LaunchedEffect(Unit) { authRepo.authState().collect { user = it } }
+
+    var screen by remember { mutableStateOf(if (user == null) Screen.AUTH else Screen.HOME) }
+    LaunchedEffect(user) { screen = if (user == null) Screen.AUTH else Screen.HOME }
+    var selectedRoom by remember { mutableStateOf<Room?>(null) }
+    // rezervările pe ziua curentă pentru sala selectată
+    var reservationsToday by remember { mutableStateOf<List<Reservation>>(emptyList()) }
 
     when (screen) {
+        Screen.AUTH -> AuthScreen(onAuthenticated = { screen = Screen.HOME })
+
         Screen.HOME -> {
-            val user = UPTUser(
-                firstName = "Indi",
-                lastName = "Boțoc",
+            val profile = UPTUser(
+                firstName = user?.email?.substringBefore("@") ?: "Student",
+                lastName = "",
                 roles = setOf(UserRole.STUDENT)
             )
             HomeScreen(
-                user = user,
-                background = painterResource(R.drawable.bg_upt),
+                user = profile,
+                currentBuildingId = "aspc",
                 logo = painterResource(R.drawable.upt_logo),
                 onFindRoomClick = { screen = Screen.ROOMS },
-                onMyReservationsClick = { /* TODO: screen = Screen.RESERVATIONS */ },
-                onApproveRequestsClick = { /* TODO: screen = Screen.APPROVALS */ }
+                onMyReservationsClick = { /* ... */ },
+                onApproveRequestsClick = { /* ... */ }
             )
         }
 
         Screen.ROOMS -> {
-            // Chemi ecranul cu tab-uri. Leagă aici repo-ul tău real.
-            val repo = remember { RoomRepository() }
+            val roomRepo = remember { RoomRepository() }
+            val buildingId = "aspc"
+            BackHandler { screen = Screen.HOME }
             RoomsScreen(
-                onSpecificSearch = { buildingId, blockId, floor, roomNumber ->
-                    // TODO: înlocuiește cu interogarea ta reală (Firestore/DAO)
-                    // ex: roomRepo.searchSpecific(buildingId, floor, roomNumber)
-                    repo.searchSpecific(buildingId, blockId, floor, roomNumber)
-                },
-                onPrefsSearch = { minCap, hasPCs, os ->
-                    // TODO: înlocuiește cu interogarea ta reală
-                    // ex: roomRepo.searchByPreferences(minCapacity, hasComputers, os)
-                    repo.searchByPreferences(minCap, hasPCs, os)
-                },
+                currentBuildingId = buildingId,
+                onSpecificSearch = roomRepo::searchSpecific,
+                onPrefsSearch = roomRepo::searchByPreferences,
                 onRoomClick = { room ->
-                    // TODO: navighează la detalii: screen = Screen.ROOM_DETAILS
+                    selectedRoom = room
+                    screen = Screen.ROOM_DETAILS
                 }
             )
         }
-    }
+        Screen.ROOM_DETAILS -> {
+            val room = selectedRoom
+            BackHandler { screen = Screen.ROOMS }
+
+            LaunchedEffect(room?.id) {
+                if (room != null) {
+                    reservationsToday = roomRepo.getReservationsForRoomToday(room.id)
+                } else {
+                    reservationsToday = emptyList()
+                }
+            }
+
+            if (room != null) {
+                RoomDetailsScreen(
+                    room = room,
+                    reservationsToday = reservationsToday,
+                    onBack = { screen = Screen.ROOMS },
+                    onOpenCalendar = { roomId, hourSlot ->
+                        // aici ulterior poți deschide un ecran separat de calendar
+                        // de ex. screen = Screen.ROOM_CALENDAR, etc.
+                    }
+                )
+            }
+        }
+}
 }

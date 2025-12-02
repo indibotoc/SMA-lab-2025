@@ -29,11 +29,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun RoomsScreen(
-    backgroundRes: Int = R.drawable.bg_upt,
-    // UPDATED: now includes blockId
-    onSpecificSearch: suspend (
-        buildingId: String?, blockId: String?, floor: Int?, roomNumber: String?
-    ) -> List<Room>,
+    currentBuildingId: String,
+    onSpecificSearch: suspend (buildingId: String?, blockId: String?, floor: Int?, roomNumber: String?) -> List<Room>,
     onPrefsSearch: suspend (minCapacity: Int?, hasComputers: Boolean?, os: String?) -> List<Room>,
     onRoomClick: (Room) -> Unit = {}
 ) {
@@ -54,12 +51,9 @@ fun RoomsScreen(
     val tabs = listOf("Find a specific room", "Find a room by preferences")
 
     Box(Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(backgroundRes),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
+        com.example.where2upt.geo.CampusBackground(
+            buildingId = currentBuildingId,
+            modifier = Modifier.fillMaxSize())
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(listOf(Color(0x99000000), Color(0x33000000)))

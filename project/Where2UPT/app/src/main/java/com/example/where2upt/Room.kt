@@ -18,5 +18,6 @@ data class Room(
     val status: String = "active",                // active|maintenance|archived
     val hostUid: String = "",
     val updatedAt: Timestamp? = null,
-    val lastUpdatedBy: String = ""
+    val lastUpdatedBy: String = "",
+    val photoUrls: List<String> = emptyList()
 )

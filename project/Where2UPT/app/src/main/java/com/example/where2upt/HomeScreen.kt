@@ -12,7 +12,11 @@ import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.RuleFolder
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -28,7 +32,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.where2upt.R
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlinx.coroutines.tasks.await
 
 // ---- Roles (ajustează denumirile la modelul tău real)
 enum class UserRole { STUDENT, TEACHER, ROOM_HOST, FACULTY_ADMIN, SUPER_ADMIN }
@@ -44,12 +52,13 @@ data class UPTUser(
 @Composable
 fun HomeScreen(
     user: UPTUser,
-    background: Painter = painterResource(R.drawable.bg_upt), // pune o poză UPT
-    logo: Painter = painterResource(R.drawable.upt_logo),       // pune logo-ul UPT
+    currentBuildingId: String,
+    logo: Painter = painterResource(R.drawable.upt_logo),
     onFindRoomClick: () -> Unit,
     onMyReservationsClick: () -> Unit,
     onApproveRequestsClick: () -> Unit,
 ) {
+
     // 1) Salutare în limba telefonului
     val ctx = LocalContext.current
     val locale: Locale = remember {
@@ -58,20 +67,52 @@ fun HomeScreen(
         else
             @Suppress("DEPRECATION") ctx.resources.configuration.locale
     }
-    val greeting = remember(locale) { greetingFor(locale) } // „Welcome” / „Bună” / etc.
+    val greeting = remember(locale) { greetingFor(locale) }
 
     // 2) Are drept de aprobare?
     val canApprove = remember(user.roles) {
         user.roles.intersect(setOf(UserRole.ROOM_HOST, UserRole.FACULTY_ADMIN, UserRole.SUPER_ADMIN)).isNotEmpty()
     }
 
+    // 3) Avatar (Base64) & sheet state
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    val uid = firebaseUser?.uid
+    var photoB64 by remember { mutableStateOf<String?>(null) }
+
+    var shortName by remember {
+        mutableStateOf(
+            firstNameOf(
+                // fallback local dacă nu avem încă din Firestore/Auth
+                user.firstName.ifBlank { user.fullName }
+            )
+        )
+    }
+
+    // Load current base64 avatar from Firestore
+    LaunchedEffect(uid) {
+        uid?.let {
+            val snap = FirebaseFirestore.getInstance()
+                .collection("users").document(it).get().await()
+            photoB64 = snap.getString("photo")
+
+            val displayNameFromDb = snap.getString("displayName")
+                ?: firebaseUser?.displayName
+                ?: firebaseUser?.email
+                    ?.substringBefore("@")
+                    ?.replace(".", " ")
+                    ?.replaceFirstChar { c -> c.uppercase() }
+
+            displayNameFromDb?.let { dn ->
+                shortName = firstNameOf(dn)
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Fundal foto
-        Image(
-            painter = background,
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+        com.example.where2upt.geo.CampusBackground(
+            buildingId = currentBuildingId,
+            modifier = Modifier.fillMaxSize()
         )
 
         // Scrim + coloană conținut
@@ -88,16 +129,19 @@ fun HomeScreen(
                 )
         )
 
+        var showAccount by remember { mutableStateOf(false) }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(20.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header: logo UPT
+            // Header: logo UPT (stânga) + avatar (dreapta, Base64)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Image(
                     painter = logo,
@@ -105,6 +149,12 @@ fun HomeScreen(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(10.dp))
+                )
+
+                ProfileAvatarBase64(
+                    photoBase64 = photoB64,
+                    onClick = { showAccount = true },
+                    modifier = Modifier
                 )
             }
 
@@ -120,7 +170,7 @@ fun HomeScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = user.fullName + "!",
+                    text = "$shortName!",
                     color = Color.White,
                     fontSize = 44.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -156,7 +206,7 @@ fun HomeScreen(
                             else -> "Requests to approve"
                         },
                         iconLeft = Icons.Default.RuleFolder,
-                        badge = "•", // simplu indicator; poți conecta un număr real
+                        badge = "•",
                         onClick = onApproveRequestsClick
                     )
                 }
@@ -173,8 +223,30 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 8.dp).alpha(0.9f)
             )
         }
+
+        // Account bottom sheet (upload→resize→base64 handled inside AccountSheet/ProfileRepository)
+        if (showAccount) {
+            AccountSheet(
+                onSeeReservations = onMyReservationsClick,
+                onLogout = { AuthRepository().logout() },
+                onDismiss = {
+                    showAccount = false
+                    // refresh avatar after sheet closes (in case it changed)
+                    // Re-read photo field:
+                    uid?.let {
+                        // fire-and-forget refresh; you can also use addSnapshotListener if you want live updates
+                        kotlinx.coroutines.GlobalScope.launch {
+                            val snap = FirebaseFirestore.getInstance()
+                                .collection("users").document(it).get().await()
+                            photoB64 = snap.getString("photo")
+                        }
+                    }
+                }
+            )
+        }
     }
 }
+
 
 @Composable
 private fun TransparentActionButton(
@@ -219,6 +291,12 @@ private fun TransparentActionButton(
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
         }
     }
+}
+
+private fun firstNameOf(full: String): String {
+    val parts = full.trim().split(Regex("\\s+"))
+    val candidate = parts.lastOrNull().orEmpty()
+    return candidate.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }
 
 private fun greetingFor(locale: Locale): String = when (locale.language.lowercase(Locale.ROOT)) {

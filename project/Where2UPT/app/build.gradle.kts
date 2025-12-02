@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.where2upt"
-        minSdk = 24
+        minSdk = 26 // was 24
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -62,5 +62,9 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.material.icons.extended)
-
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth.ktx)
+    implementation("com.jakewharton.threetenabp:threetenabp:1.4.6")
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil:2.7.0")
 }

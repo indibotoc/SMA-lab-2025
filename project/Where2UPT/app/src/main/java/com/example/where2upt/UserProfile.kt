@@ -6,6 +6,8 @@ data class UserProfile(
     val facultyId: String = "",
     val displayName: String = "",
     val managedRooms: List<String> = emptyList(), // pentru host
-    val email: String = ""
-
+    val email: String = "",
+    val photo: String = "",
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L
 )
