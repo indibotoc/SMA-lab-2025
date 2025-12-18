@@ -1,5 +1,6 @@
 package com.example.where2upt
 
+import com.example.where2upt.Reservation
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
@@ -36,23 +37,20 @@ class RoomRepository {
         return q.get().await().toObjects(Room::class.java)
     }
 
-    suspend fun getReservationsForRoomToday(roomId: String): List<Reservation> {
-        val zone = ZoneId.systemDefault()
+    suspend fun getReservationsForRoom(roomId: String, date: org.threeten.bp.LocalDate): List<Reservation> {
+        val zone = org.threeten.bp.ZoneId.systemDefault()
+        val startOfDay = date.atStartOfDay(zone).toInstant().toEpochMilli()
+        val endOfDay = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
-        val today = LocalDate.now()
-        val startOfDay = today.atStartOfDay(zone).toInstant().toEpochMilli()
-        val endOfDay = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-
-        val snapshot = col.collection("reservations")
-            .whereEqualTo("roomId", roomId)
+        val snapshot = col.collection("rooms")
+            .document(roomId)
+            .collection("reservations")
+            .whereGreaterThanOrEqualTo("startTime", startOfDay)
+            .whereLessThan("startTime", endOfDay)
             .get()
             .await()
 
-        val all = snapshot.toObjects(Reservation::class.java)
-
-        return all.filter { res ->
-            res.startTime in startOfDay until endOfDay
-        }
+        return snapshot.toObjects(Reservation::class.java)
     }
 
     // Helper care transformă stringul gol în null (pentru a-l ignora ușor)

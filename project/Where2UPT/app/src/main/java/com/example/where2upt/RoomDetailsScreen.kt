@@ -20,7 +20,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -39,6 +41,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.where2upt.Reservation
 import com.google.firebase.Timestamp
 import org.threeten.bp.LocalDate
 import org.threeten.bp.LocalDateTime
@@ -93,16 +96,15 @@ fun buildHourSlotsForDay(
 @Composable
 fun RoomDetailsScreen(
     room: Room,
-    reservationsToday: List<Reservation>,
+    reservationsToday: List<Reservation>, // Acestea vor fi rezervările pentru data selectată
+    selectedDate: LocalDate, // Parametru nou pentru a ști ce zi afișăm
+    onDateChange: (LocalDate) -> Unit, // Callback pentru a schimba data din MainActivity
     onBack: () -> Unit,
     onOpenCalendar: (roomId: String, hourSlot: HourSlot?) -> Unit
 ) {
-    // IMPORTANT: LocalDate este din org.threeten.bp, NU din java.time
-    val today = remember { LocalDate.now() }
-
-    val hourSlots = remember(reservationsToday, today) {
+    val hourSlots = remember(reservationsToday, selectedDate) {
         buildHourSlotsForDay(
-            date = today,
+            date = selectedDate,
             reservations = reservationsToday,
             startHour = 8,
             endHour = 22
@@ -124,12 +126,35 @@ fun RoomDetailsScreen(
             )
         }
     ) { padding ->
+        // TOT conținutul trebuie să fie în acest Column pentru a fi interactiv și scrollabil
         Column(
             modifier = Modifier
-                .padding(padding)
+                .padding(padding) // Respectă înălțimea TopAppBar-ului
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            // 1. MUTĂ selectorul de dată AICI (în interiorul coloanei)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { onDateChange(selectedDate.minusDays(1)) }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Ziua precedentă")
+                }
+                Text(
+                    text = selectedDate.toString(),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                IconButton(onClick = { onDateChange(selectedDate.plusDays(1)) }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Ziua următoare")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             RoomHeader(room = room)
             Spacer(modifier = Modifier.height(16.dp))
             RoomPhotosCarousel(photoUrls = room.photoUrls)
@@ -138,7 +163,7 @@ fun RoomDetailsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Disponibilitate azi",
+                text = "Disponibilitate",
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -152,7 +177,7 @@ fun RoomDetailsScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Atinge un interval pentru a deschide calendarul detaliat.",
+                text = "Atinge un interval pentru a rezerva.",
                 style = MaterialTheme.typography.bodySmall
             )
 
@@ -162,7 +187,7 @@ fun RoomDetailsScreen(
                 onClick = { onOpenCalendar(room.id, null) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(text = "Vezi calendarul complet al sălii")
+                Text(text = "Vezi calendarul complet")
             }
         }
     }

@@ -171,6 +171,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.painterResource
+import com.example.where2upt.Reservation
 import com.example.where2upt.ui.theme.Where2UPTTheme
 import com.google.firebase.auth.FirebaseAuth
 
@@ -181,13 +182,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { AUTH, HOME, ROOMS, ROOM_DETAILS }
+private enum class Screen { AUTH, HOME, ROOMS, ROOM_DETAILS, CREATE_RESERVATION }
 
 @Composable
 private fun AppRoot() {
     val authRepo = remember { AuthRepository() }
     val roomRepo = remember { RoomRepository() }
-
+    var selectedHourSlot by remember { mutableStateOf<HourSlot?>(null) }
+    var selectedDate by remember { mutableStateOf(org.threeten.bp.LocalDate.now()) }
     var user by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
 
     LaunchedEffect(Unit) { authRepo.authState().collect { user = it } }
@@ -209,7 +211,7 @@ private fun AppRoot() {
             )
             HomeScreen(
                 user = profile,
-                currentBuildingId = "aspc",
+                currentBuildingId = "electro",
                 logo = painterResource(R.drawable.upt_logo),
                 onFindRoomClick = { screen = Screen.ROOMS },
                 onMyReservationsClick = { /* ... */ },
@@ -219,7 +221,7 @@ private fun AppRoot() {
 
         Screen.ROOMS -> {
             val roomRepo = remember { RoomRepository() }
-            val buildingId = "aspc"
+            val buildingId = "electro"
             BackHandler { screen = Screen.HOME }
             RoomsScreen(
                 currentBuildingId = buildingId,
@@ -235,9 +237,9 @@ private fun AppRoot() {
             val room = selectedRoom
             BackHandler { screen = Screen.ROOMS }
 
-            LaunchedEffect(room?.id) {
+            LaunchedEffect(room?.id, selectedDate) {
                 if (room != null) {
-                    reservationsToday = roomRepo.getReservationsForRoomToday(room.id)
+                    reservationsToday = roomRepo.getReservationsForRoom(room.id, selectedDate)
                 } else {
                     reservationsToday = emptyList()
                 }
@@ -247,11 +249,41 @@ private fun AppRoot() {
                 RoomDetailsScreen(
                     room = room,
                     reservationsToday = reservationsToday,
+                    selectedDate = selectedDate, // Transmite data
+                    onDateChange = { newDate -> selectedDate = newDate }, // Actualizează data
                     onBack = { screen = Screen.ROOMS },
                     onOpenCalendar = { roomId, hourSlot ->
-                        // aici ulterior poți deschide un ecran separat de calendar
-                        // de ex. screen = Screen.ROOM_CALENDAR, etc.
+                        if (hourSlot != null && !hourSlot.isReserved) {
+                            val now = org.threeten.bp.LocalDateTime.now()
+                            val slotTime = selectedDate.atTime(hourSlot.hour, 0)
+
+                            if (slotTime.isBefore(now)) {
+                                // Opțional: afișează un mesaj că nu se poate rezerva în trecut
+                            } else {
+                                selectedHourSlot = hourSlot
+                                screen = Screen.CREATE_RESERVATION
+                            }
+                        }
                     }
+                )
+            }
+        }
+        Screen.CREATE_RESERVATION -> {
+            val room = selectedRoom
+            val slot = selectedHourSlot
+            BackHandler { screen = Screen.ROOM_DETAILS }
+
+            if (room != null && slot != null) {
+                // Aici va trebui să creezi un fișier nou "CreateReservationScreen.kt"
+                // sau să îl definești temporar aici.
+                CreateReservationScreen(
+                    room = room,
+                    slot = slot,
+                    date = selectedDate, // Transmitem data selectată
+                    onSuccess = {
+                        screen = Screen.ROOM_DETAILS // se întoarce și reîncarcă lista
+                    },
+                    onBack = { screen = Screen.ROOM_DETAILS }
                 )
             }
         }
