@@ -65,22 +65,15 @@ fun buildHourSlotsForDay(
     startHour: Int,
     endHour: Int
 ): List<HourSlot> {
-
-    val dayReservations = reservations.filter { res ->
-        val start = res.startTime.toLocalDateTime()
-        start.toLocalDate() == date
-    }
+    val zone = ZoneId.systemDefault()
 
     return (startHour until endHour).map { hour ->
+        val slotStart = date.atTime(hour, 0).atZone(zone).toInstant().toEpochMilli()
+        val slotEnd = slotStart + 3600000 // +1 oră fix
 
-        val slotReservation = dayReservations.firstOrNull { res ->
-            val start = res.startTime.toLocalDateTime()
-            val end = res.endTime.toLocalDateTime()
-
-            val slotStart = date.atTime(hour, 0)
-            val slotEnd = slotStart.plusHours(1)
-
-            !slotEnd.isBefore(start) && !slotStart.isAfter(end)
+        val slotReservation = reservations.firstOrNull { res ->
+            // Logică de suprapunere strictă: StartA < EndB AND EndA > StartB
+            res.startTime < slotEnd && res.endTime > slotStart
         }
 
         HourSlot(
